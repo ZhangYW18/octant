@@ -23,6 +23,7 @@ import (
 )
 
 var pluginName = "plugin-name"
+var actionName = "sample-plugin/sample-action"
 
 // This is a sample plugin showing the features of Octant's plugin API.
 func main() {
@@ -36,6 +37,7 @@ func main() {
 	capabilities := &plugin.Capabilities{
 		SupportsPrinterConfig: []schema.GroupVersionKind{podGVK},
 		SupportsTab:           []schema.GroupVersionKind{podGVK},
+		ActionNames: 		   []string{actionName},
 		IsModule:              true,
 	}
 
@@ -44,6 +46,7 @@ func main() {
 		service.WithPrinter(handlePrint),
 		service.WithTabPrinter(handleTab),
 		service.WithNavigation(handleNavigation, initRoutes),
+		service.WithActionHandler(handleAction),
 	}
 
 	// Use the plugin service helper to register this plugin.
@@ -172,6 +175,12 @@ func handleNavigation(request *service.NavigationRequest) (navigation.Navigation
 	}, nil
 }
 
+func handleAction(request *service.ActionRequest) error {
+	log.Printf("DEBUGLOG clientid %s", request.ClientID)
+	alert := action.CreateAlert(action.AlertTypeInfo, fmt.Sprintf(time.Now().String()), action.DefaultAlertExpiration)
+	return request.DashboardClient.SendAlert(request.Context(), request.ClientID, alert)
+}
+
 // initRoutes routes for this plugin. In this example, there is a global catch all route
 // that will return the content for every single path.
 func initRoutes(router *service.Router) {
@@ -179,6 +188,17 @@ func initRoutes(router *service.Router) {
 		cardBody := component.NewText(fmt.Sprintf("hello from plugin: path %s", requestPath))
 		card := component.NewCard(component.TitleFromString(fmt.Sprintf("My Card - %s", name)))
 		card.SetBody(cardBody)
+
+		form := component.Form{Fields: []component.FormField{
+			component.NewFormFieldHidden("action", actionName),
+		}}
+		testButton := component.Action{
+			Name:  "Test Button",
+			Title: "Test Button",
+			Form:  form,
+		}
+		card.AddAction(testButton)
+
 		cardList := component.NewCardList(name)
 		cardList.AddCard(*card)
 		cardList.SetAccessor(accessor)
